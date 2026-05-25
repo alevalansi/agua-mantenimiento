@@ -23,7 +23,7 @@ export default function AnalyzerView() {
     return (
       <PageWrapper>
         <div className="text-center py-20 text-slate-500">
-          <p>מנתח לא נמצא</p>
+          <p>מד לא נמצא</p>
           <button onClick={() => navigate(`/station/${id}`)} className="mt-4 text-sky-400 text-sm">חזור</button>
         </div>
       </PageWrapper>

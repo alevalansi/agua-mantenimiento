@@ -49,7 +49,7 @@ export default function Dashboard() {
 
   const stats = [
     { label: 'תחנות', value: stations.length, icon: MapPin, color: 'text-sky-400', bg: 'bg-sky-400/10' },
-    { label: 'מנתחים', value: analyzers.length, icon: Cpu, color: 'text-violet-400', bg: 'bg-violet-400/10' },
+    { label: 'מדים', value: analyzers.length, icon: Cpu, color: 'text-violet-400', bg: 'bg-violet-400/10' },
     { label: 'תחזוקות החודש', value: monthLogs.length, icon: Wrench, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
     { label: 'התראות פעילות', value: alerts.length, icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-400/10' },
   ];
@@ -151,7 +151,7 @@ export default function Dashboard() {
                                     {STATUS_LABELS[station.status] || station.status}
                                   </span>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-0.5">{station.location} • {stationAnalyzers.length} מנתחים</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{station.location} • {stationAnalyzers.length} מדים</p>
                               </Link>
                               <ChevronLeft size={16} className="text-slate-600 flex-shrink-0" />
                             </div>
@@ -191,7 +191,7 @@ export default function Dashboard() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-100 truncate">
-                          {analyzer?.name || 'מנתח לא ידוע'}
+                          {analyzer?.name || 'מד לא ידוע'}
                         </p>
                         <p className="text-xs text-slate-400 truncate">{station?.name}</p>
                         <p className="text-xs text-slate-500 mt-1">{log.maintenance_type} • {log.technician_name}</p>

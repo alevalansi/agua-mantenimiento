@@ -119,7 +119,7 @@ export default function MaintenanceLogs() {
                     </div>
 
                     <p className="font-medium text-slate-100 text-sm">
-                      {log._analyzer?.name || 'מנתח לא ידוע'}
+                      {log._analyzer?.name || 'מד לא ידוע'}
                     </p>
                     <p className="text-xs text-slate-400">{log._station?.name}</p>
                     <p className="text-xs text-slate-300 mt-1 line-clamp-2">{log.description}</p>

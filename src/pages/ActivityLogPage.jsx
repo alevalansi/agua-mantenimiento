@@ -21,13 +21,13 @@ const ACTION_ICONS = {
 const ACTION_LABELS = {
   login: 'התחברות',
   add_station: 'הוספת תחנה',
-  add_analyzer: 'הוספת מנתח',
+  add_analyzer: 'הוספת מד',
   add_maintenance: 'תחזוקה',
   add_chemical: 'שימוש בכימיקל',
   add_inventory: 'עדכון מלאי',
   add_technician: 'הוספת טכנאי',
   edit_station: 'עריכת תחנה',
-  delete_analyzer: 'מחיקת מנתח',
+  delete_analyzer: 'מחיקת מד',
   delete_station: 'מחיקת תחנה',
 };
 

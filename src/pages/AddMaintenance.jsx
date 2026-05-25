@@ -107,8 +107,8 @@ export default function AddMaintenance() {
                   <option value="">-- בחר תחנה --</option>
                   {stations.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
-                <Select label="מנתח *" required value={form.analyzer_id} onChange={set('analyzer_id')}>
-                  <option value="">-- בחר מנתח --</option>
+                <Select label="מד *" required value={form.analyzer_id} onChange={set('analyzer_id')}>
+                  <option value="">-- בחר מד --</option>
                   {analyzers.filter((a) => !form.station_id || a.station_id === form.station_id)
                     .map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </Select>

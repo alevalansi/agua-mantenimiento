@@ -159,7 +159,7 @@ export default function UpcomingTasks() {
         <Card className="p-12 text-center">
           <CalendarClock size={40} className="mx-auto text-slate-600 mb-3" />
           <p className="text-slate-500 text-sm">אין משימות מתוזמנות</p>
-          <p className="text-slate-600 text-xs mt-1">הגדר מרווחי תחזוקה במנתחים</p>
+          <p className="text-slate-600 text-xs mt-1">הגדר מרווחי תחזוקה במדים</p>
         </Card>
       ) : (
         <>

@@ -61,14 +61,14 @@ export default function StationView() {
   };
 
   const handleDeleteAnalyzer = async (analyzerId, analyzerName) => {
-    if (!confirm(`למחוק את המנתח "${analyzerName}"?`)) return;
+    if (!confirm(`למחוק את המד "${analyzerName}"?`)) return;
     try {
       await deleteAnalyzer(analyzerId);
       await refreshAnalyzers();
       await logActivity({
         technician_name: currentTechnician?.name,
         action_type: 'delete_analyzer',
-        description: `מחיקת מנתח ${analyzerName} מתחנה ${station.name}`,
+        description: `מחיקת מד ${analyzerName} מתחנה ${station.name}`,
         station_name: station.name,
         analyzer_name: analyzerName,
       });
@@ -87,7 +87,7 @@ export default function StationView() {
         actions={
           <Button onClick={() => navigate(`/add-analyzer?stationId=${id}`)}>
             <Plus size={16} />
-            הוסף מנתח
+            הוסף מד
           </Button>
         }
       />
@@ -165,15 +165,15 @@ export default function StationView() {
 
       {/* Analyzers Grid */}
       <h2 className="text-base font-semibold text-slate-200 mb-3">
-        מנתחים ({stationAnalyzers.length})
+        מדים ({stationAnalyzers.length})
       </h2>
 
       {stationAnalyzers.length === 0 ? (
         <Card className="p-12 text-center">
           <Cpu size={40} className="mx-auto text-slate-600 mb-3" />
-          <p className="text-slate-500 text-sm mb-4">אין מנתחים בתחנה זו</p>
+          <p className="text-slate-500 text-sm mb-4">אין מדים בתחנה זו</p>
           <Button onClick={() => navigate(`/add-analyzer?stationId=${id}`)}>
-            <Plus size={16} />הוסף מנתח ראשון
+            <Plus size={16} />הוסף מד ראשון
           </Button>
         </Card>
       ) : (

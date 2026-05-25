@@ -53,7 +53,7 @@ export default function AddAnalyzer() {
       await logActivity({
         technician_name: currentTechnician?.name,
         action_type: 'add_analyzer',
-        description: `הוספת מנתח ${created.name} לתחנה ${station?.name || ''}`,
+        description: `הוספת מד ${created.name} לתחנה ${station?.name || ''}`,
         station_name: station?.name,
         analyzer_name: created.name,
       });
@@ -76,7 +76,7 @@ export default function AddAnalyzer() {
   return (
     <PageWrapper>
       <PageHeader
-        title="הוספת מנתח חדש"
+        title="הוספת מד חדש"
         subtitle={station ? `לתחנה: ${station.name}` : ''}
         back={stationId ? `/station/${stationId}` : '/dashboard'}
       />
@@ -88,7 +88,7 @@ export default function AddAnalyzer() {
               <Cpu size={28} className="text-violet-400" />
             </div>
 
-            <Input label="שם המנתח *" required placeholder="לדוגמה: מנתח pH ראשי" value={form.name} onChange={set('name')} />
+            <Input label="שם המד *" required placeholder="לדוגמה: מד pH ראשי" value={form.name} onChange={set('name')} />
 
             {!stationId && (
               <Select label="תחנה *" required value={form.station_id} onChange={set('station_id')}>
@@ -100,7 +100,7 @@ export default function AddAnalyzer() {
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <Select label="סוג מנתח" value={form.type} onChange={set('type')}>
+              <Select label="סוג מד" value={form.type} onChange={set('type')}>
                 {Object.entries(ANALYZER_TYPES).map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
                 ))}
@@ -141,7 +141,7 @@ export default function AddAnalyzer() {
 
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={saving || !form.name.trim() || (!form.station_id)} className="flex-1 justify-center">
-                {saving ? 'מוסיף...' : 'הוסף מנתח'}
+                {saving ? 'מוסיף...' : 'הוסף מד'}
               </Button>
               <Button type="button" variant="secondary" onClick={() => navigate(stationId ? `/station/${stationId}` : '/dashboard')}>
                 ביטול
