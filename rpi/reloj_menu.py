@@ -2,6 +2,7 @@
 import time
 import struct
 import threading
+import numpy as np
 from PIL import Image, ImageDraw
 
 FB = '/dev/fb0'
@@ -17,13 +18,13 @@ def map_touch(raw_x, raw_y):
     return max(0, min(WIDTH-1, x)), max(0, min(HEIGHT-1, y))
 
 def write_fb(img):
-    pixels = img.convert('RGB')
+    arr = np.array(img.convert('RGB'), dtype=np.uint16)
+    r = arr[:, :, 0] >> 3
+    g = arr[:, :, 1] >> 2
+    b = arr[:, :, 2] >> 3
+    rgb565 = (r << 11) | (g << 5) | b
     with open(FB, 'wb') as f:
-        for y in range(HEIGHT):
-            for x in range(WIDTH):
-                r, g, b = pixels.getpixel((x, y))
-                color = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
-                f.write(struct.pack('H', color))
+        f.write(rgb565.astype('<u2').tobytes())
 
 def draw_clock():
     img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
@@ -62,12 +63,16 @@ def read_touch():
     EVENT_SIZE = 24
     pressed = False
     raw_x, raw_y = 0, 0
+    start_time = time.monotonic()
     with open(TOUCH, 'rb') as f:
         while True:
             data = f.read(EVENT_SIZE)
             if len(data) < EVENT_SIZE:
                 continue
             _, _, ev_type, ev_code, ev_value = struct.unpack('llHHI', data)
+            # Skip all events in the first 1.5 seconds to flush the kernel buffer
+            if time.monotonic() - start_time < 1.5:
+                continue
             if ev_type == 3:
                 if ev_code == 0:
                     raw_x = ev_value
@@ -93,7 +98,7 @@ def main():
 
     def touch_reader():
         for x, y in touch_gen:
-            now = time.time()
+            now = time.monotonic()
             if now - last_touch_time[0] < DEBOUNCE:
                 continue
             last_touch_time[0] = now
@@ -103,10 +108,6 @@ def main():
 
     t = threading.Thread(target=touch_reader, daemon=True)
     t.start()
-
-    # Drain buffered touch events before starting
-    time.sleep(0.5)
-    touch_event.clear()
 
     while True:
         if state == 'clock':
