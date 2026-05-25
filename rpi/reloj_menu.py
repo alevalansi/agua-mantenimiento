@@ -2,13 +2,12 @@
 import time
 import struct
 import threading
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 FB = '/dev/fb0'
 TOUCH = '/dev/input/event5'
 WIDTH, HEIGHT = 480, 320
 
-# Touch raw range calibration
 X_MIN, X_MAX = 200, 3900
 Y_MIN, Y_MAX = 200, 3900
 
@@ -39,26 +38,15 @@ def draw_clock():
 def draw_menu():
     img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 20))
     draw = ImageDraw.Draw(img)
-
-    # Saludo
     draw.text((150, 30), "Hola Ale!", fill=(0, 200, 255))
-
-    # Boton App1
     draw.rectangle([40, 100, 200, 160], fill=(0, 80, 160), outline=(0, 150, 255), width=2)
     draw.text((85, 120), "App 1", fill=(255, 255, 255))
-
-    # Boton App2
     draw.rectangle([190, 100, 350, 160], fill=(0, 80, 160), outline=(0, 150, 255), width=2)
     draw.text((235, 120), "App 2", fill=(255, 255, 255))
-
-    # Boton App3
     draw.rectangle([360, 100, 440, 160], fill=(0, 80, 160), outline=(0, 150, 255), width=2)
     draw.text((375, 120), "App 3", fill=(255, 255, 255))
-
-    # Instruccion volver
     draw.text((130, 260), "Toca aqui para volver", fill=(80, 80, 80))
     draw.rectangle([100, 250, 380, 290], outline=(60, 60, 60), width=1)
-
     return img
 
 def launch_app(app_name):
@@ -67,7 +55,6 @@ def launch_app(app_name):
     draw.text((100, 140), f"Iniciando {app_name}...", fill=(0, 255, 100))
     write_fb(img)
     time.sleep(2)
-    # Aqui va el comando para lanzar cada app
     # import subprocess
     # subprocess.Popen(['python3', f'/home/aleia/{app_name}.py'])
 
@@ -86,15 +73,14 @@ def read_touch():
                     raw_x = ev_value
                 elif ev_code == 1:
                     raw_y = ev_value
-                elif ev_code == 24:
-                    pressed = ev_value > 0
             elif ev_type == 1 and ev_code == 330:
-                pressed = ev_value == 1
-            elif ev_type == 0:
-                if pressed and raw_x > 0:
-                    yield map_touch(raw_x, raw_y)
+                if ev_value == 1:
+                    pressed = True
+                else:
+                    if pressed and raw_x > 0:
+                        yield map_touch(raw_x, raw_y)
+                    pressed = False
 
-# Estado
 state = 'clock'
 
 def main():
@@ -102,15 +88,25 @@ def main():
     touch_gen = read_touch()
     touch_event = threading.Event()
     touch_pos = [0, 0]
+    last_touch_time = [0.0]
+    DEBOUNCE = 0.8
 
     def touch_reader():
         for x, y in touch_gen:
+            now = time.time()
+            if now - last_touch_time[0] < DEBOUNCE:
+                continue
+            last_touch_time[0] = now
             touch_pos[0] = x
             touch_pos[1] = y
             touch_event.set()
 
     t = threading.Thread(target=touch_reader, daemon=True)
     t.start()
+
+    # Drain buffered touch events before starting
+    time.sleep(0.5)
+    touch_event.clear()
 
     while True:
         if state == 'clock':
@@ -124,22 +120,17 @@ def main():
             if touch_event.wait(timeout=60):
                 touch_event.clear()
                 x, y = touch_pos
-                # Boton App1
                 if 40 <= x <= 200 and 100 <= y <= 160:
                     launch_app("App 1")
                     state = 'menu'
-                # Boton App2
                 elif 190 <= x <= 350 and 100 <= y <= 160:
                     launch_app("App 2")
                     state = 'menu'
-                # Boton App3
                 elif 360 <= x <= 440 and 100 <= y <= 160:
                     launch_app("App 3")
                     state = 'menu'
-                # Volver al reloj
                 elif 100 <= x <= 380 and 250 <= y <= 290:
                     state = 'clock'
-                # Timeout vuelve al reloj
             else:
                 state = 'clock'
 
