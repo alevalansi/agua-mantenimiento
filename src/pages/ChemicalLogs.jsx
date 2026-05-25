@@ -1,19 +1,21 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FlaskConical, Package, Plus, Search, TrendingDown, AlertTriangle } from 'lucide-react';
+import { FlaskConical, Package, Plus, Search, AlertTriangle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, KEYS } from '../utils/storage';
+import { addChemicalInventoryItem } from '../utils/storage';
 import { formatDate, UNITS } from '../utils/helpers';
-import { PageWrapper, PageHeader, Card, Button, Input } from '../components/Layout';
+import { PageWrapper, PageHeader, Card, Button } from '../components/Layout';
 
 export default function ChemicalLogs() {
   const navigate = useNavigate();
-  const { chemicalConsumptions, chemicalInventory, analyzers, stations, refresh, currentTechnician, logActivity } = useApp();
+  const { chemicalConsumptions, chemicalInventory, analyzers, stations,
+    refreshChemicalInventory, currentTechnician, logActivity } = useApp();
   const [tab, setTab] = useState('consumptions');
   const [search, setSearch] = useState('');
   const [showAddInventory, setShowAddInventory] = useState(false);
   const [invForm, setInvForm] = useState({ chemical_name: '', unit: 'מ"ל', current_stock: '', minimum_threshold: '', notes: '' });
+  const [saving, setSaving] = useState(false);
 
   const enriched = useMemo(() => {
     return chemicalConsumptions
@@ -42,27 +44,32 @@ export default function ChemicalLogs() {
     return chemicalInventory.filter((i) => i.chemical_name?.toLowerCase().includes(q));
   }, [chemicalInventory, search]);
 
-  const handleAddInventory = (e) => {
+  const handleAddInventory = async (e) => {
     e.preventDefault();
     if (!invForm.chemical_name.trim()) return;
-    const list = getList(KEYS.CHEMICAL_INVENTORY);
-    list.push({
-      id: crypto.randomUUID(),
-      chemical_name: invForm.chemical_name.trim(),
-      unit: invForm.unit,
-      current_stock: parseFloat(invForm.current_stock) || 0,
-      minimum_threshold: parseFloat(invForm.minimum_threshold) || 0,
-      notes: invForm.notes.trim(),
-    });
-    setList(KEYS.CHEMICAL_INVENTORY, list);
-    refresh(KEYS.CHEMICAL_INVENTORY);
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'add_inventory',
-      description: `הוספת כימיקל למלאי: ${invForm.chemical_name}`,
-    });
-    setInvForm({ chemical_name: '', unit: 'מ"ל', current_stock: '', minimum_threshold: '', notes: '' });
-    setShowAddInventory(false);
+    setSaving(true);
+    try {
+      await addChemicalInventoryItem({
+        chemical_name: invForm.chemical_name.trim(),
+        unit: invForm.unit,
+        current_stock: parseFloat(invForm.current_stock) || 0,
+        minimum_threshold: parseFloat(invForm.minimum_threshold) || 0,
+        notes: invForm.notes.trim(),
+      });
+      await refreshChemicalInventory();
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'add_inventory',
+        description: `הוספת כימיקל למלאי: ${invForm.chemical_name}`,
+      });
+      setInvForm({ chemical_name: '', unit: 'מ"ל', current_stock: '', minimum_threshold: '', notes: '' });
+      setShowAddInventory(false);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -136,7 +143,7 @@ export default function ChemicalLogs() {
           <div className="space-y-3">
             <div className="flex justify-end">
               <Button onClick={() => setShowAddInventory(!showAddInventory)} variant="secondary">
-                <Plus size={16} />{showAddInventory ? 'ביטול' : 'הוסף לכימיקל למלאי'}
+                <Plus size={16} />{showAddInventory ? 'ביטול' : 'הוסף כימיקל למלאי'}
               </Button>
             </div>
 
@@ -157,7 +164,9 @@ export default function ChemicalLogs() {
                       className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
                   </div>
                   <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white rounded-lg py-2 text-sm">הוסף</button>
+                    <button type="submit" disabled={saving} className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm">
+                      {saving ? 'מוסיף...' : 'הוסף'}
+                    </button>
                   </div>
                 </form>
               </Card>
@@ -169,7 +178,7 @@ export default function ChemicalLogs() {
                 <p className="text-slate-500 text-sm">אין פריטים במלאי</p>
               </Card>
             ) : filteredInventory.map((item) => {
-              const isLow = item.current_stock <= item.minimum_threshold;
+              const isLow = item.minimum_threshold > 0 && item.current_stock <= item.minimum_threshold;
               return (
                 <Card key={item.id} className={`p-4 ${isLow ? 'border-amber-500/30' : ''}`}>
                   <div className="flex items-center justify-between gap-2">

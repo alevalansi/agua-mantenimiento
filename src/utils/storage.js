@@ -1,70 +1,268 @@
-// localStorage keys
+import { supabase } from '../lib/supabase';
+
+// localStorage keys (kept only for non-DB items)
 export const KEYS = {
-  STATIONS: 'stations',
-  ANALYZERS: 'analyzers',
-  MAINTENANCE_LOGS: 'maintenanceLogs',
-  CHEMICAL_CONSUMPTIONS: 'chemicalConsumptions',
-  CHEMICAL_INVENTORY: 'chemicalInventory',
-  TECHNICIANS: 'technicians',
-  ACTIVITY_LOG: 'activityLog',
   CURRENT_TECHNICIAN: 'currentTechnician',
+  STATIONS_ORDER: 'stationsOrder',
 };
 
-export function getItem(key) {
+// ── localStorage helpers (for currentTechnician & stationsOrder only) ───────
+export function getCurrentTechnician() {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(KEYS.CURRENT_TECHNICIAN);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-export function setItem(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-export function getList(key) {
-  return getItem(key) || [];
-}
-
-export function setList(key, list) {
-  setItem(key, list);
-}
-
-export function addToList(key, item) {
-  const list = getList(key);
-  list.push(item);
-  setList(key, list);
-  return list;
-}
-
-export function updateInList(key, id, updates) {
-  const list = getList(key);
-  const idx = list.findIndex((i) => i.id === id);
-  if (idx !== -1) {
-    list[idx] = { ...list[idx], ...updates };
-  }
-  setList(key, list);
-  return list;
-}
-
-export function removeFromList(key, id) {
-  const list = getList(key).filter((i) => i.id !== id);
-  setList(key, list);
-  return list;
-}
-
-export function getCurrentTechnician() {
-  return getItem(KEYS.CURRENT_TECHNICIAN);
-}
-
 export function setCurrentTechnician(tech) {
-  setItem(KEYS.CURRENT_TECHNICIAN, tech);
+  localStorage.setItem(KEYS.CURRENT_TECHNICIAN, JSON.stringify(tech));
 }
 
-export function addActivityLog(entry) {
-  const logs = getList(KEYS.ACTIVITY_LOG);
-  logs.unshift({ id: crypto.randomUUID(), date: new Date().toISOString(), ...entry });
-  if (logs.length > 500) logs.splice(500);
-  setList(KEYS.ACTIVITY_LOG, logs);
+export function getStationsOrder() {
+  try {
+    const raw = localStorage.getItem(KEYS.STATIONS_ORDER);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setStationsOrder(order) {
+  localStorage.setItem(KEYS.STATIONS_ORDER, JSON.stringify(order));
+}
+
+// ── Supabase helpers ─────────────────────────────────────────────────────────
+
+// TECHNICIANS
+export async function getTechnicians() {
+  const { data, error } = await supabase
+    .from('technicians')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addTechnician(tech) {
+  const { data, error } = await supabase
+    .from('technicians')
+    .insert(tech)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateTechnician(id, updates) {
+  const { data, error } = await supabase
+    .from('technicians')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteTechnician(id) {
+  const { error } = await supabase
+    .from('technicians')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// STATIONS
+export async function getStations() {
+  const { data, error } = await supabase
+    .from('stations')
+    .select('*');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addStation(station) {
+  const { data, error } = await supabase
+    .from('stations')
+    .insert(station)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateStation(id, updates) {
+  const { data, error } = await supabase
+    .from('stations')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteStation(id) {
+  const { error } = await supabase
+    .from('stations')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// ANALYZERS
+export async function getAnalyzers() {
+  const { data, error } = await supabase
+    .from('analyzers')
+    .select('*');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addAnalyzer(analyzer) {
+  const { data, error } = await supabase
+    .from('analyzers')
+    .insert(analyzer)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateAnalyzer(id, updates) {
+  const { data, error } = await supabase
+    .from('analyzers')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAnalyzer(id) {
+  const { error } = await supabase
+    .from('analyzers')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// MAINTENANCE LOGS
+export async function getMaintenanceLogs() {
+  const { data, error } = await supabase
+    .from('maintenance_logs')
+    .select('*')
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addMaintenanceLog(log) {
+  const { data, error } = await supabase
+    .from('maintenance_logs')
+    .insert(log)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// CHEMICAL CONSUMPTIONS
+export async function getChemicalConsumptions() {
+  const { data, error } = await supabase
+    .from('chemical_consumptions')
+    .select('*')
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addChemicalConsumption(entry) {
+  const { data, error } = await supabase
+    .from('chemical_consumptions')
+    .insert(entry)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// CHEMICAL INVENTORY
+export async function getChemicalInventory() {
+  const { data, error } = await supabase
+    .from('chemical_inventory')
+    .select('*')
+    .order('chemical_name');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addChemicalInventoryItem(item) {
+  const { data, error } = await supabase
+    .from('chemical_inventory')
+    .insert(item)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateChemicalInventoryItem(id, updates) {
+  const { data, error } = await supabase
+    .from('chemical_inventory')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteChemicalInventoryItem(id) {
+  const { error } = await supabase
+    .from('chemical_inventory')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function decrementChemicalInventory(chemicalName, unit, quantity) {
+  const { data: items } = await supabase
+    .from('chemical_inventory')
+    .select('*')
+    .eq('chemical_name', chemicalName)
+    .eq('unit', unit)
+    .limit(1);
+  if (items && items.length > 0) {
+    const item = items[0];
+    const newStock = Math.max(0, (parseFloat(item.current_stock) || 0) - parseFloat(quantity));
+    await supabase
+      .from('chemical_inventory')
+      .update({ current_stock: newStock })
+      .eq('id', item.id);
+  }
+}
+
+// ACTIVITY LOG
+export async function getActivityLog() {
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addActivityLog(entry) {
+  const { error } = await supabase
+    .from('activity_log')
+    .insert({
+      date: new Date().toISOString().split('T')[0],
+      ...entry,
+    });
+  if (error) console.error('Activity log error:', error);
 }

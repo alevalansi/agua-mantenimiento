@@ -1,46 +1,61 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Plus, Phone, Star, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
+import { Users, Plus, Phone, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, updateInList, removeFromList, KEYS } from '../utils/storage';
+import { addTechnician, updateTechnician, deleteTechnician } from '../utils/storage';
 import { PageWrapper, PageHeader, Card, Button } from '../components/Layout';
 
 export default function Technicians() {
-  const { technicians, refresh, currentTechnician, logActivity } = useApp();
+  const { technicians, refreshTechnicians, currentTechnician, logActivity } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', specialty: '' });
+  const [saving, setSaving] = useState(false);
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    const list = getList(KEYS.TECHNICIANS);
-    list.push({
-      id: crypto.randomUUID(),
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      specialty: form.specialty.trim(),
-      is_active: true,
-    });
-    setList(KEYS.TECHNICIANS, list);
-    refresh(KEYS.TECHNICIANS);
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'add_technician',
-      description: `הוספת טכנאי: ${form.name}`,
-    });
-    setForm({ name: '', phone: '', specialty: '' });
-    setShowForm(false);
+    setSaving(true);
+    try {
+      await addTechnician({
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        specialty: form.specialty.trim(),
+        is_active: true,
+      });
+      await refreshTechnicians();
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'add_technician',
+        description: `הוספת טכנאי: ${form.name}`,
+      });
+      setForm({ name: '', phone: '', specialty: '' });
+      setShowForm(false);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleActive = (tech) => {
-    updateInList(KEYS.TECHNICIANS, tech.id, { is_active: !tech.is_active });
-    refresh(KEYS.TECHNICIANS);
+  const toggleActive = async (tech) => {
+    try {
+      await updateTechnician(tech.id, { is_active: !tech.is_active });
+      await refreshTechnicians();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name) => {
     if (!confirm(`למחוק את הטכנאי "${name}"?`)) return;
-    removeFromList(KEYS.TECHNICIANS, id);
-    refresh(KEYS.TECHNICIANS);
+    try {
+      await deleteTechnician(id);
+      await refreshTechnicians();
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה במחיקה: ' + (err.message || err));
+    }
   };
 
   const active = technicians.filter((t) => t.is_active !== false);
@@ -70,7 +85,9 @@ export default function Technicians() {
               <input placeholder="התמחות" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })}
                 className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
             </div>
-            <button type="submit" className="w-full bg-sky-500 hover:bg-sky-600 text-white rounded-lg py-2 text-sm font-medium">הוסף</button>
+            <button type="submit" disabled={saving} className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium">
+              {saving ? 'מוסיף...' : 'הוסף'}
+            </button>
           </form>
         </Card>
       )}

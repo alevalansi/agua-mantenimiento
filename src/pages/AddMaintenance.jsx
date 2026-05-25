@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Wrench } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, updateInList, KEYS } from '../utils/storage';
+import { addMaintenanceLog, updateAnalyzer } from '../utils/storage';
 import { MAINTENANCE_TYPES, addDays, todayISO } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Input, Select, Textarea, Button } from '../components/Layout';
 
@@ -13,7 +13,7 @@ export default function AddMaintenance() {
   const analyzerId = searchParams.get('analyzerId');
   const stationId = searchParams.get('stationId');
 
-  const { analyzers, stations, currentTechnician, refresh, logActivity } = useApp();
+  const { analyzers, stations, currentTechnician, refreshMaintenanceLogs, refreshAnalyzers, logActivity } = useApp();
   const analyzer = analyzers.find((a) => a.id === analyzerId);
   const station = stations.find((s) => s.id === stationId);
 
@@ -32,48 +32,54 @@ export default function AddMaintenance() {
     needs_followup: false,
     followup_notes: '',
   });
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.analyzer_id || !form.technician_name.trim()) return;
+    setSaving(true);
 
-    const newLog = {
-      id: crypto.randomUUID(),
-      ...form,
-      duration_minutes: form.duration_minutes ? parseInt(form.duration_minutes) : null,
-      renewal_interval_days: form.renewal_interval_days ? parseInt(form.renewal_interval_days) : null,
-    };
+    try {
+      const newLog = {
+        ...form,
+        duration_minutes: form.duration_minutes ? parseInt(form.duration_minutes) : null,
+        renewal_interval_days: form.renewal_interval_days ? parseInt(form.renewal_interval_days) : null,
+      };
 
-    const logs = getList(KEYS.MAINTENANCE_LOGS);
-    logs.push(newLog);
-    setList(KEYS.MAINTENANCE_LOGS, logs);
+      await addMaintenanceLog(newLog);
 
-    // Update analyzer dates
-    if (form.status === 'completed') {
-      const updates = { last_maintenance_date: form.date };
-      if (form.is_recurring && form.renewal_interval_days) {
-        updates.next_maintenance_date = addDays(form.date, parseInt(form.renewal_interval_days));
-      } else if (analyzer?.maintenance_interval_days) {
-        updates.next_maintenance_date = addDays(form.date, analyzer.maintenance_interval_days);
+      // Update analyzer dates
+      if (form.status === 'completed') {
+        const updates = { last_maintenance_date: form.date };
+        if (form.is_recurring && form.renewal_interval_days) {
+          updates.next_maintenance_date = addDays(form.date, parseInt(form.renewal_interval_days));
+        } else if (analyzer?.maintenance_interval_days) {
+          updates.next_maintenance_date = addDays(form.date, analyzer.maintenance_interval_days);
+        }
+        await updateAnalyzer(form.analyzer_id, updates);
+        await refreshAnalyzers();
       }
-      updateInList(KEYS.ANALYZERS, form.analyzer_id, updates);
-      refresh(KEYS.ANALYZERS);
-    }
 
-    refresh(KEYS.MAINTENANCE_LOGS);
+      await refreshMaintenanceLogs();
 
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'add_maintenance',
-      description: `תחזוקה ${MAINTENANCE_TYPES[form.maintenance_type]} - ${analyzer?.name}`,
-      station_name: station?.name,
-      analyzer_name: analyzer?.name,
-    });
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'add_maintenance',
+        description: `תחזוקה ${MAINTENANCE_TYPES[form.maintenance_type]} - ${analyzer?.name}`,
+        station_name: station?.name,
+        analyzer_name: analyzer?.name,
+      });
 
-    if (stationId && analyzerId) {
-      navigate(`/station/${stationId}/analyzer/${analyzerId}`);
-    } else {
-      navigate('/logs/maintenance');
+      if (stationId && analyzerId) {
+        navigate(`/station/${stationId}/analyzer/${analyzerId}`);
+      } else {
+        navigate('/logs/maintenance');
+      }
+    } catch (err) {
+      console.error('Failed to save maintenance log:', err);
+      alert('שגיאה בשמירה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -162,7 +168,9 @@ export default function AddMaintenance() {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <Button type="submit" className="flex-1 justify-center">שמור תחזוקה</Button>
+              <Button type="submit" disabled={saving} className="flex-1 justify-center">
+                {saving ? 'שומר...' : 'שמור תחזוקה'}
+              </Button>
               <Button type="button" variant="secondary" onClick={() => navigate(-1)}>ביטול</Button>
             </div>
           </form>

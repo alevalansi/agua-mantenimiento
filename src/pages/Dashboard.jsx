@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -7,17 +7,33 @@ import {
   ChevronLeft, Clock, CheckCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, KEYS } from '../utils/storage';
+import { updateStation, getStationsOrder, setStationsOrder } from '../utils/storage';
 import { formatDate, STATUS_LABELS, STATUS_COLORS, ANALYZER_TYPES } from '../utils/helpers';
 import { PageWrapper, Card } from '../components/Layout';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { currentTechnician, stations, analyzers, maintenanceLogs, refresh } = useApp();
-  const [stationList, setStationList] = useState(() => {
-    const s = getList(KEYS.STATIONS);
-    return s.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-  });
+  const { currentTechnician, stations, analyzers, maintenanceLogs, refreshStations } = useApp();
+
+  const [stationList, setStationList] = useState([]);
+
+  // Apply saved order from localStorage whenever stations change
+  useEffect(() => {
+    if (stations.length === 0) return;
+    const savedOrder = getStationsOrder();
+    if (savedOrder.length > 0) {
+      const orderMap = {};
+      savedOrder.forEach((id, i) => { orderMap[id] = i; });
+      const sorted = [...stations].sort((a, b) => {
+        const oa = orderMap[a.id] ?? 999;
+        const ob = orderMap[b.id] ?? 999;
+        return oa - ob;
+      });
+      setStationList(sorted);
+    } else {
+      setStationList(stations);
+    }
+  }, [stations]);
 
   const thisMonth = new Date();
   const monthLogs = maintenanceLogs.filter((l) => {
@@ -38,15 +54,14 @@ export default function Dashboard() {
     { label: 'התראות פעילות', value: alerts.length, icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-400/10' },
   ];
 
-  const handleDragEnd = (result) => {
+  const handleDragEnd = async (result) => {
     if (!result.destination) return;
     const items = Array.from(stationList);
     const [moved] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, moved);
-    const updated = items.map((s, i) => ({ ...s, order: i }));
-    setStationList(updated);
-    setList(KEYS.STATIONS, updated);
-    refresh(KEYS.STATIONS);
+    setStationList(items);
+    // Save order to localStorage (not Supabase - order is local preference)
+    setStationsOrder(items.map((s) => s.id));
   };
 
   return (

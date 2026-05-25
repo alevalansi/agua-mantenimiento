@@ -3,14 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Edit2, Check, X, Cpu, ChevronLeft, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, updateInList, removeFromList, KEYS } from '../utils/storage';
+import { updateStation, deleteAnalyzer } from '../utils/storage';
 import { STATUS_LABELS, STATUS_COLORS, ANALYZER_TYPES, formatDate, daysUntil } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Button } from '../components/Layout';
 
 export default function StationView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { stations, analyzers, refresh, logActivity, currentTechnician } = useApp();
+  const { stations, analyzers, refreshStations, refreshAnalyzers, logActivity, currentTechnician } = useApp();
 
   const station = stations.find((s) => s.id === id);
   const stationAnalyzers = analyzers.filter((a) => a.station_id === id);
@@ -34,34 +34,48 @@ export default function StationView() {
     setEditValue(currentValue || '');
   };
 
-  const saveEdit = () => {
-    const list = getList(KEYS.STATIONS);
-    const idx = list.findIndex((s) => s.id === id);
-    if (idx !== -1) {
-      list[idx] = { ...list[idx], [editField]: editValue };
-      setList(KEYS.STATIONS, list);
-      refresh(KEYS.STATIONS);
-      logActivity({
+  const saveEdit = async () => {
+    try {
+      await updateStation(id, { [editField]: editValue });
+      await refreshStations();
+      await logActivity({
         technician_name: currentTechnician?.name,
         action_type: 'edit_station',
         description: `עדכון שדה ${editField} בתחנה ${station.name}`,
         station_name: station.name,
       });
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה בעדכון: ' + (err.message || err));
     }
     setEditField(null);
   };
 
-  const deleteAnalyzer = (analyzerId, analyzerName) => {
+  const handleStatusChange = async (value) => {
+    try {
+      await updateStation(id, { status: value });
+      await refreshStations();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteAnalyzer = async (analyzerId, analyzerName) => {
     if (!confirm(`למחוק את המנתח "${analyzerName}"?`)) return;
-    removeFromList(KEYS.ANALYZERS, analyzerId);
-    refresh(KEYS.ANALYZERS);
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'delete_analyzer',
-      description: `מחיקת מנתח ${analyzerName} מתחנה ${station.name}`,
-      station_name: station.name,
-      analyzer_name: analyzerName,
-    });
+    try {
+      await deleteAnalyzer(analyzerId);
+      await refreshAnalyzers();
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'delete_analyzer',
+        description: `מחיקת מנתח ${analyzerName} מתחנה ${station.name}`,
+        station_name: station.name,
+        analyzer_name: analyzerName,
+      });
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה במחיקה: ' + (err.message || err));
+    }
   };
 
   return (
@@ -86,10 +100,7 @@ export default function StationView() {
             <p className="text-xs text-slate-400 mb-1">סטטוס</p>
             <select
               value={station.status}
-              onChange={(e) => {
-                updateInList(KEYS.STATIONS, id, { status: e.target.value });
-                refresh(KEYS.STATIONS);
-              }}
+              onChange={(e) => handleStatusChange(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
             >
               {Object.entries(STATUS_LABELS).map(([v, l]) => (
@@ -178,7 +189,7 @@ export default function StationView() {
               >
                 <Card className="p-4 hover:border-slate-700 transition-colors relative group">
                   <button
-                    onClick={() => deleteAnalyzer(analyzer.id, analyzer.name)}
+                    onClick={() => handleDeleteAnalyzer(analyzer.id, analyzer.name)}
                     className="absolute top-2 left-2 p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 size={14} />

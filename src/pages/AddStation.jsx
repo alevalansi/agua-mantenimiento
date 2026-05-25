@@ -3,44 +3,47 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, KEYS } from '../utils/storage';
+import { addStation } from '../utils/storage';
 import { STATUS_LABELS } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Input, Select, Textarea, Button } from '../components/Layout';
 
 export default function AddStation() {
   const navigate = useNavigate();
-  const { refresh, logActivity, currentTechnician } = useApp();
+  const { refreshStations, logActivity, currentTechnician } = useApp();
   const [form, setForm] = useState({
-    name: '', location: '', status: 'operational', notes: '',
+    name: '', location: '', status: 'active', notes: '',
   });
   const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     setSaving(true);
 
-    const list = getList(KEYS.STATIONS);
-    const newStation = {
-      id: crypto.randomUUID(),
-      name: form.name.trim(),
-      location: form.location.trim(),
-      status: form.status,
-      notes: form.notes.trim(),
-      order: list.length,
-    };
-    list.push(newStation);
-    setList(KEYS.STATIONS, list);
-    refresh(KEYS.STATIONS);
+    try {
+      const newStation = {
+        name: form.name.trim(),
+        location: form.location.trim(),
+        status: form.status,
+        notes: form.notes.trim(),
+      };
+      const created = await addStation(newStation);
+      await refreshStations();
 
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'add_station',
-      description: `הוספת תחנה חדשה: ${newStation.name}`,
-      station_name: newStation.name,
-    });
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'add_station',
+        description: `הוספת תחנה חדשה: ${created.name}`,
+        station_name: created.name,
+      });
 
-    navigate('/dashboard');
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Failed to add station:', err);
+      alert('שגיאה בהוספה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value });

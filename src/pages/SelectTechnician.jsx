@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Droplets, User, Plus, Phone, Star, ChevronLeft } from 'lucide-react';
+import { Droplets, User, Plus, Phone, ChevronLeft } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, KEYS } from '../utils/storage';
+import { addTechnician } from '../utils/storage';
 
 export default function SelectTechnician() {
   const navigate = useNavigate();
-  const { technicians, setCurrentTechnician, refresh, logActivity } = useApp();
+  const { technicians, loading, dbError, setCurrentTechnician, refreshTechnicians, logActivity } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', specialty: '' });
+  const [saving, setSaving] = useState(false);
 
   const activeTechs = technicians.filter((t) => t.is_active !== false);
 
@@ -23,23 +24,62 @@ export default function SelectTechnician() {
     navigate('/dashboard');
   };
 
-  const handleAddTech = (e) => {
+  const handleAddTech = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    const list = getList(KEYS.TECHNICIANS);
-    const newTech = {
-      id: crypto.randomUUID(),
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      specialty: form.specialty.trim(),
-      is_active: true,
-    };
-    list.push(newTech);
-    setList(KEYS.TECHNICIANS, list);
-    refresh(KEYS.TECHNICIANS);
-    setForm({ name: '', phone: '', specialty: '' });
-    setShowForm(false);
+    setSaving(true);
+    try {
+      await addTechnician({
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        specialty: form.specialty.trim(),
+        is_active: true,
+      });
+      await refreshTechnicians();
+      setForm({ name: '', phone: '', specialty: '' });
+      setShowForm(false);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">מתחבר לבסיס הנתונים...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4" dir="rtl">
+        <div className="max-w-md w-full bg-slate-900 border border-red-500/30 rounded-xl p-6 text-center">
+          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-400 text-2xl font-bold">!</span>
+          </div>
+          <h2 className="text-lg font-semibold text-red-400 mb-2">שגיאת חיבור למסד הנתונים</h2>
+          <p className="text-slate-400 text-sm mb-3">{dbError}</p>
+          <p className="text-slate-500 text-xs mb-4 leading-relaxed">
+            יש להריץ את קובץ ה-SQL ב-Supabase Dashboard (SQL Editor) כדי ליצור את הטבלאות.
+            הקובץ נמצא ב: <code className="text-sky-400">supabase/migrations/20260525000000_init.sql</code>
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm"
+          >
+            נסה שוב
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4 py-8" dir="rtl">
@@ -126,8 +166,8 @@ export default function SelectTechnician() {
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
               />
               <div className="flex gap-2">
-                <button type="submit" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white rounded-lg py-2 text-sm font-medium transition-colors">
-                  הוסף
+                <button type="submit" disabled={saving} className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium transition-colors">
+                  {saving ? 'מוסיף...' : 'הוסף'}
                 </button>
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm transition-colors">
                   ביטול

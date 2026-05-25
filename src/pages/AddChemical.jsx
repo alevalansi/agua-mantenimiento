@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FlaskConical } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, updateInList, KEYS } from '../utils/storage';
+import { addChemicalConsumption, decrementChemicalInventory } from '../utils/storage';
 import { UNITS, todayISO } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Input, Select, Textarea, Button } from '../components/Layout';
 
@@ -13,7 +13,8 @@ export default function AddChemical() {
   const analyzerId = searchParams.get('analyzerId');
   const stationId = searchParams.get('stationId');
 
-  const { analyzers, stations, chemicalInventory, currentTechnician, refresh, logActivity } = useApp();
+  const { analyzers, stations, chemicalInventory, currentTechnician,
+    refreshChemicalConsumptions, refreshChemicalInventory, logActivity } = useApp();
   const analyzer = analyzers.find((a) => a.id === analyzerId);
   const station = stations.find((s) => s.id === stationId);
 
@@ -31,6 +32,7 @@ export default function AddChemical() {
     notes: '',
   });
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const inventoryNames = useMemo(() =>
     [...new Set(chemicalInventory.map((i) => i.chemical_name))],
@@ -41,44 +43,44 @@ export default function AddChemical() {
     ? inventoryNames.filter((n) => n.includes(form.chemical_name) && n !== form.chemical_name)
     : inventoryNames;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.chemical_name.trim() || !form.quantity || !form.analyzer_id) return;
+    setSaving(true);
 
-    const newEntry = {
-      id: crypto.randomUUID(),
-      ...form,
-      quantity: parseFloat(form.quantity),
-      renewal_interval_days: form.renewal_interval_days ? parseInt(form.renewal_interval_days) : null,
-    };
+    try {
+      const newEntry = {
+        ...form,
+        quantity: parseFloat(form.quantity),
+        renewal_interval_days: form.renewal_interval_days ? parseInt(form.renewal_interval_days) : null,
+        expiry_date: form.expiry_date || null,
+      };
 
-    const consumptions = getList(KEYS.CHEMICAL_CONSUMPTIONS);
-    consumptions.push(newEntry);
-    setList(KEYS.CHEMICAL_CONSUMPTIONS, consumptions);
+      await addChemicalConsumption(newEntry);
 
-    // Decrement inventory if exists
-    const inventory = getList(KEYS.CHEMICAL_INVENTORY);
-    const invIdx = inventory.findIndex((i) => i.chemical_name === form.chemical_name && i.unit === form.unit);
-    if (invIdx !== -1) {
-      inventory[invIdx].current_stock = Math.max(0, (parseFloat(inventory[invIdx].current_stock) || 0) - parseFloat(form.quantity));
-      setList(KEYS.CHEMICAL_INVENTORY, inventory);
-      refresh(KEYS.CHEMICAL_INVENTORY);
-    }
+      // Decrement inventory if exists
+      await decrementChemicalInventory(form.chemical_name, form.unit, form.quantity);
+      await refreshChemicalInventory();
+      await refreshChemicalConsumptions();
 
-    refresh(KEYS.CHEMICAL_CONSUMPTIONS);
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'add_chemical',
+        description: `שימוש בכימיקל ${form.chemical_name} (${form.quantity} ${form.unit}) - ${analyzer?.name}`,
+        station_name: station?.name,
+        analyzer_name: analyzer?.name,
+      });
 
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'add_chemical',
-      description: `שימוש בכימיקל ${form.chemical_name} (${form.quantity} ${form.unit}) - ${analyzer?.name}`,
-      station_name: station?.name,
-      analyzer_name: analyzer?.name,
-    });
-
-    if (stationId && analyzerId) {
-      navigate(`/station/${stationId}/analyzer/${analyzerId}`);
-    } else {
-      navigate('/logs/chemical');
+      if (stationId && analyzerId) {
+        navigate(`/station/${stationId}/analyzer/${analyzerId}`);
+      } else {
+        navigate('/logs/chemical');
+      }
+    } catch (err) {
+      console.error('Failed to save chemical log:', err);
+      alert('שגיאה בשמירה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -170,7 +172,9 @@ export default function AddChemical() {
             <Textarea label="הערות" placeholder="הערות נוספות..." value={form.notes} onChange={set('notes')} rows={2} />
 
             <div className="flex gap-3 pt-2">
-              <Button type="submit" className="flex-1 justify-center">שמור</Button>
+              <Button type="submit" disabled={saving} className="flex-1 justify-center">
+                {saving ? 'שומר...' : 'שמור'}
+              </Button>
               <Button type="button" variant="secondary" onClick={() => navigate(-1)}>ביטול</Button>
             </div>
           </form>

@@ -2,38 +2,46 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Package, Plus, AlertTriangle, Edit2, Trash2, Check, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getList, setList, updateInList, removeFromList, KEYS } from '../utils/storage';
+import {
+  addChemicalInventoryItem, updateChemicalInventoryItem, deleteChemicalInventoryItem
+} from '../utils/storage';
 import { UNITS } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Button } from '../components/Layout';
 
 export default function ChemicalInventoryPage() {
-  const { chemicalInventory, refresh, currentTechnician, logActivity } = useApp();
+  const { chemicalInventory, refreshChemicalInventory, currentTechnician, logActivity } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [form, setForm] = useState({ chemical_name: '', unit: 'מ"ל', current_stock: '', minimum_threshold: '', notes: '' });
+  const [saving, setSaving] = useState(false);
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.chemical_name.trim()) return;
-    const list = getList(KEYS.CHEMICAL_INVENTORY);
-    list.push({
-      id: crypto.randomUUID(),
-      chemical_name: form.chemical_name.trim(),
-      unit: form.unit,
-      current_stock: parseFloat(form.current_stock) || 0,
-      minimum_threshold: parseFloat(form.minimum_threshold) || 0,
-      notes: form.notes.trim(),
-    });
-    setList(KEYS.CHEMICAL_INVENTORY, list);
-    refresh(KEYS.CHEMICAL_INVENTORY);
-    logActivity({
-      technician_name: currentTechnician?.name,
-      action_type: 'add_inventory',
-      description: `הוספת כימיקל למלאי: ${form.chemical_name}`,
-    });
-    setForm({ chemical_name: '', unit: 'מ"ל', current_stock: '', minimum_threshold: '', notes: '' });
-    setShowForm(false);
+    setSaving(true);
+    try {
+      await addChemicalInventoryItem({
+        chemical_name: form.chemical_name.trim(),
+        unit: form.unit,
+        current_stock: parseFloat(form.current_stock) || 0,
+        minimum_threshold: parseFloat(form.minimum_threshold) || 0,
+        notes: form.notes.trim(),
+      });
+      await refreshChemicalInventory();
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'add_inventory',
+        description: `הוספת כימיקל למלאי: ${form.chemical_name}`,
+      });
+      setForm({ chemical_name: '', unit: 'מ"ל', current_stock: '', minimum_threshold: '', notes: '' });
+      setShowForm(false);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const startEdit = (item) => {
@@ -41,22 +49,32 @@ export default function ChemicalInventoryPage() {
     setEditValues({ ...item });
   };
 
-  const saveEdit = () => {
-    updateInList(KEYS.CHEMICAL_INVENTORY, editId, {
-      chemical_name: editValues.chemical_name,
-      unit: editValues.unit,
-      current_stock: parseFloat(editValues.current_stock) || 0,
-      minimum_threshold: parseFloat(editValues.minimum_threshold) || 0,
-      notes: editValues.notes || '',
-    });
-    refresh(KEYS.CHEMICAL_INVENTORY);
-    setEditId(null);
+  const saveEdit = async () => {
+    try {
+      await updateChemicalInventoryItem(editId, {
+        chemical_name: editValues.chemical_name,
+        unit: editValues.unit,
+        current_stock: parseFloat(editValues.current_stock) || 0,
+        minimum_threshold: parseFloat(editValues.minimum_threshold) || 0,
+        notes: editValues.notes || '',
+      });
+      await refreshChemicalInventory();
+      setEditId(null);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה בעדכון: ' + (err.message || err));
+    }
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name) => {
     if (!confirm(`למחוק את "${name}"?`)) return;
-    removeFromList(KEYS.CHEMICAL_INVENTORY, id);
-    refresh(KEYS.CHEMICAL_INVENTORY);
+    try {
+      await deleteChemicalInventoryItem(id);
+      await refreshChemicalInventory();
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה במחיקה: ' + (err.message || err));
+    }
   };
 
   const lowStock = chemicalInventory.filter((i) => i.current_stock <= i.minimum_threshold && i.minimum_threshold > 0);
@@ -105,7 +123,9 @@ export default function ChemicalInventoryPage() {
             </div>
             <input placeholder="הערות" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none" />
-            <button type="submit" className="w-full bg-sky-500 hover:bg-sky-600 text-white rounded-lg py-2 text-sm font-medium">הוסף</button>
+            <button type="submit" disabled={saving} className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium">
+              {saving ? 'מוסיף...' : 'הוסף'}
+            </button>
           </form>
         </Card>
       )}

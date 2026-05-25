@@ -18,7 +18,43 @@ import ActivityLogPage from './pages/ActivityLogPage';
 import UpcomingTasks from './pages/UpcomingTasks';
 
 function ProtectedRoute({ children }) {
-  const { currentTechnician } = useApp();
+  const { currentTechnician, loading, dbError } = useApp();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">טוען נתונים...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900 border border-red-500/30 rounded-xl p-6 text-center">
+          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-400 text-xl">!</span>
+          </div>
+          <h2 className="text-lg font-semibold text-red-400 mb-2">שגיאת חיבור למסד הנתונים</h2>
+          <p className="text-slate-400 text-sm mb-4">{dbError}</p>
+          <p className="text-slate-500 text-xs">
+            יש להריץ את קובץ ה-SQL ליצירת הטבלאות ב-Supabase Dashboard.
+            ראה את הקובץ <code className="text-sky-400">supabase/migrations/</code> בפרויקט.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm"
+          >
+            נסה שוב
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentTechnician) return <Navigate to="/" replace />;
   return <Layout>{children}</Layout>;
 }
