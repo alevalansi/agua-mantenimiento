@@ -83,16 +83,19 @@ export default function AnalyzerView() {
         subtitle={`${station?.name || ''} • ${ANALYZER_TYPES[analyzer.type] || analyzer.type}`}
         back={`/station/${id}`}
         actions={
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={startEdit}>
-              <Pencil size={16} />עריכה
-            </Button>
-            <Button onClick={() => navigate(`/add-maintenance?analyzerId=${analyzerId}&stationId=${id}`)}>
-              <Plus size={16} />תחזוקה
-            </Button>
-            <Button variant="secondary" onClick={() => navigate(`/add-chemical?analyzerId=${analyzerId}&stationId=${id}`)}>
-              <Plus size={16} />כימיקל
-            </Button>
+          <div className="flex flex-col gap-1">
+            <button onClick={() => navigate(`/add-maintenance?analyzerId=${analyzerId}&stationId=${id}`)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors">
+              <Plus size={13} />תחזוקה
+            </button>
+            <button onClick={() => navigate(`/add-chemical?analyzerId=${analyzerId}&stationId=${id}`)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs transition-colors">
+              <Plus size={13} />כימיקל
+            </button>
+            <button onClick={startEdit}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 rounded-lg text-xs transition-colors">
+              <Pencil size={13} />עריכה
+            </button>
           </div>
         }
       />
