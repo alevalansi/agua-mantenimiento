@@ -8,7 +8,7 @@ FB = '/dev/fb0'
 TOUCH = '/dev/input/event5'
 WIDTH, HEIGHT = 480, 320
 X_MIN, X_MAX = 200, 3900
-Y_MIN, Y_MAX = 200, 3900
+Y_MIN, Y_MAX = 200, 2200
 
 print("=== reloj_menu v5-debug ===")
 
