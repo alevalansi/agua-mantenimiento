@@ -65,7 +65,7 @@ export const ANALYZER_TYPES = {
 
 export const MAINTENANCE_TYPES = {
   preventive: 'מניעתי',
-  corrective: 'מתקן',
+  corrective: 'תיקון',
   calibration: 'כיול',
   inspection: 'בדיקה',
   chemical_renewal: 'חידוש כימיקל',
