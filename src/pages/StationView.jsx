@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Edit2, Check, X, Cpu, ChevronLeft, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Check, X, Cpu, Trash2, Copy } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { updateStation, deleteAnalyzer } from '../utils/storage';
+import { updateStation, deleteAnalyzer, addAnalyzer } from '../utils/storage';
 import { STATUS_LABELS, STATUS_COLORS, ANALYZER_TYPES, formatDate, daysUntil } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Button } from '../components/Layout';
 
@@ -17,6 +17,47 @@ export default function StationView() {
 
   const [editField, setEditField] = useState(null);
   const [editValue, setEditValue] = useState('');
+  const [showCopy, setShowCopy] = useState(false);
+  const [copyFromId, setCopyFromId] = useState('');
+  const [copying, setCopying] = useState(false);
+
+  const otherStations = stations.filter((s) => s.id !== id);
+  const copySourceAnalyzers = copyFromId
+    ? analyzers.filter((a) => a.station_id === copyFromId)
+    : [];
+
+  const handleCopyAnalyzers = async () => {
+    if (!copyFromId || copySourceAnalyzers.length === 0) return;
+    setCopying(true);
+    try {
+      for (const a of copySourceAnalyzers) {
+        await addAnalyzer({
+          name: a.name,
+          type: a.type,
+          model: a.model,
+          status: 'operational',
+          maintenance_interval_days: a.maintenance_interval_days,
+          chemical_renewal_interval_days: a.chemical_renewal_interval_days,
+          notes: a.notes,
+          station_id: id,
+        });
+      }
+      await refreshAnalyzers();
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'copy_analyzers',
+        description: `הועתקו ${copySourceAnalyzers.length} מדים מתחנה ${stations.find(s=>s.id===copyFromId)?.name} לתחנה ${station.name}`,
+        station_name: station.name,
+      });
+      setShowCopy(false);
+      setCopyFromId('');
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה בהעתקה: ' + (err.message || err));
+    } finally {
+      setCopying(false);
+    }
+  };
 
   if (!station) {
     return (
@@ -85,10 +126,16 @@ export default function StationView() {
         subtitle={station.location}
         back="/dashboard"
         actions={
-          <Button onClick={() => navigate(`/add-analyzer?stationId=${id}`)}>
-            <Plus size={16} />
-            הוסף מד
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => { setShowCopy(!showCopy); setCopyFromId(''); }}>
+              <Copy size={16} />
+              העתק מדים
+            </Button>
+            <Button onClick={() => navigate(`/add-analyzer?stationId=${id}`)}>
+              <Plus size={16} />
+              הוסף מד
+            </Button>
+          </div>
         }
       />
 
@@ -162,6 +209,54 @@ export default function StationView() {
           </div>
         </div>
       </Card>
+
+      {/* Copy panel */}
+      {showCopy && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="p-4 mb-6 border-sky-500/30">
+            <p className="text-sm font-medium text-slate-200 mb-3">העתק מדים מתחנה אחרת</p>
+            <select
+              value={copyFromId}
+              onChange={(e) => setCopyFromId(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500 mb-3"
+            >
+              <option value="">בחר תחנת מקור...</option>
+              {otherStations.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+
+            {copySourceAnalyzers.length > 0 && (
+              <div className="mb-3 p-3 bg-slate-800 rounded-lg">
+                <p className="text-xs text-slate-400 mb-2">מדים שיועתקו ({copySourceAnalyzers.length}):</p>
+                <div className="flex flex-wrap gap-1">
+                  {copySourceAnalyzers.map((a) => (
+                    <span key={a.id} className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">
+                      {a.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopyAnalyzers}
+                disabled={!copyFromId || copying || copySourceAnalyzers.length === 0}
+                className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+              >
+                {copying ? 'מעתיק...' : `העתק ${copySourceAnalyzers.length > 0 ? copySourceAnalyzers.length + ' מדים' : ''}`}
+              </button>
+              <button
+                onClick={() => { setShowCopy(false); setCopyFromId(''); }}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm transition-colors"
+              >
+                ביטול
+              </button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Analyzers Grid */}
       <h2 className="text-base font-semibold text-slate-200 mb-3">
