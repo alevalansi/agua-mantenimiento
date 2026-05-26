@@ -55,10 +55,11 @@ export const STATUS_COLORS = {
 export const ANALYZER_TYPES = {
   ph: 'pH',
   conductivity: 'מוליכות',
+  turbidity: 'עכירות',
   boron: 'בורון',
-  alkalinity: 'בסיסיות',
-  barnes: 'בארנס',
-  sampler: 'דגמן',
+  alkalinity: 'אלקליניטי',
+  hardness: 'קשיות',
+  sampler: 'דוגם',
   other: 'אחר',
 };
 
