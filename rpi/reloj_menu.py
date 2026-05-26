@@ -7,56 +7,49 @@ from PIL import Image, ImageDraw
 FB = '/dev/fb0'
 TOUCH = '/dev/input/event5'
 WIDTH, HEIGHT = 480, 320
-X_MIN, X_MAX = 200, 3900
-Y_MIN, Y_MAX = 200, 2200
 
-print("=== reloj_menu v5-debug ===")
+# Each button is a full horizontal strip
+BTN_H = HEIGHT // 3  # 106 px tall each
 
-def map_touch(raw_x, raw_y):
-    x = int((raw_x - X_MIN) / (X_MAX - X_MIN) * WIDTH)
-    y = int((raw_y - Y_MIN) / (Y_MAX - Y_MIN) * HEIGHT)
-    return max(0, min(WIDTH-1, x)), max(0, min(HEIGHT-1, y))
+BUTTONS = [
+    {'label': 'App 1', 'y0': 0,          'y1': BTN_H,       'color': (0, 80, 160),  'text': (255, 255, 255)},
+    {'label': 'App 2', 'y0': BTN_H,      'y1': BTN_H * 2,   'color': (0, 120, 80),  'text': (255, 255, 255)},
+    {'label': 'App 3', 'y0': BTN_H * 2,  'y1': HEIGHT,      'color': (100, 0, 140), 'text': (255, 255, 255)},
+]
 
 def write_fb(img):
     pixels = img.convert('RGB')
     with open(FB, 'wb') as f:
-        for row in range(HEIGHT):
-            for col in range(WIDTH):
-                r, g, b = pixels.getpixel((col, row))
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                r, g, b = pixels.getpixel((x, y))
                 color = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
                 f.write(struct.pack('H', color))
 
-def draw_clock():
-    img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
+def draw_menu(active=None):
+    img = Image.new('RGB', (WIDTH, HEIGHT), (0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.text((120, 100), time.strftime('%H:%M:%S'), fill=(0, 255, 0))
-    draw.text((80, 160), time.strftime('%A %d/%m/%Y'), fill=(255, 255, 255))
-    draw.text((100, 230), "Toca para continuar", fill=(100, 100, 100))
+    for i, btn in enumerate(BUTTONS):
+        bg = tuple(min(255, c + 40) for c in btn['color']) if active == i else btn['color']
+        draw.rectangle([0, btn['y0'], WIDTH - 1, btn['y1'] - 1], fill=bg)
+        # Divider line
+        if btn['y0'] > 0:
+            draw.line([(0, btn['y0']), (WIDTH - 1, btn['y0'])], fill=(0, 0, 0), width=3)
+        # Label centered
+        tx, ty = 200, btn['y0'] + BTN_H // 2 - 8
+        draw.text((tx, ty), btn['label'], fill=btn['text'])
     return img
 
-def draw_menu():
-    img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 20))
+def launch_app(i):
+    img = Image.new('RGB', (WIDTH, HEIGHT), (0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.text((150, 30), "Hola Ale!", fill=(0, 200, 255))
-    draw.rectangle([40, 100, 200, 160], fill=(0, 80, 160), outline=(0, 150, 255), width=2)
-    draw.text((85, 120), "App 1", fill=(255, 255, 255))
-    draw.rectangle([190, 100, 350, 160], fill=(0, 80, 160), outline=(0, 150, 255), width=2)
-    draw.text((235, 120), "App 2", fill=(255, 255, 255))
-    draw.rectangle([360, 100, 440, 160], fill=(0, 80, 160), outline=(0, 150, 255), width=2)
-    draw.text((375, 120), "App 3", fill=(255, 255, 255))
-    draw.text((130, 260), "Toca aqui para volver", fill=(80, 80, 80))
-    draw.rectangle([100, 250, 380, 290], outline=(60, 60, 60), width=1)
-    return img
-
-def launch_app(app_name):
-    img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.text((100, 140), f"Iniciando {app_name}...", fill=(0, 255, 100))
+    draw.text((120, 140), f"Iniciando {BUTTONS[i]['label']}...", fill=(0, 255, 100))
     write_fb(img)
     time.sleep(2)
+    # import subprocess
+    # subprocess.Popen(['python3', f'/home/aleia/app{i+1}.py'])
 
 SCRIPT_START = time.time()
-print(f"SCRIPT_START = {SCRIPT_START:.3f}")
 
 def read_touch():
     EVENT_SIZE = 24
@@ -76,71 +69,38 @@ def read_touch():
                     raw_y = ev_value
             elif ev_type == 1 and ev_code == 330 and ev_value == 0:
                 event_time = tv_sec + tv_usec / 1_000_000
-                now = time.monotonic()
-                lockout_left = LOCKOUT - (now - last_yield)
-                print(f"BTN_TOUCH=0  event_t={event_time:.3f}  script_t={SCRIPT_START:.3f}  raw=({raw_x},{raw_y})  lockout_left={lockout_left:.2f}s")
                 if event_time < SCRIPT_START:
-                    print("  -> SKIP pre-start")
                     continue
-                if lockout_left > 0:
-                    print("  -> SKIP lockout")
-                    continue
-                if raw_x > 0:
-                    mapped = map_touch(raw_x, raw_y)
-                    print(f"  -> ACCEPTED mapped={mapped}")
+                now = time.monotonic()
+                if now - last_yield >= LOCKOUT and raw_x > 0:
                     last_yield = now
-                    yield mapped
-
-state = 'clock'
+                    # Map raw_y to a button index (0, 1 or 2)
+                    y_pct = (raw_y - 200) / (2200 - 200)
+                    btn = int(y_pct * 3)
+                    btn = max(0, min(2, btn))
+                    yield btn
 
 def main():
-    global state
     touch_gen = read_touch()
     touch_event = threading.Event()
-    touch_pos = [0, 0]
+    touch_btn = [0]
 
     def touch_reader():
-        for x, y in touch_gen:
-            touch_pos[0] = x
-            touch_pos[1] = y
+        for btn in touch_gen:
+            touch_btn[0] = btn
             touch_event.set()
 
     threading.Thread(target=touch_reader, daemon=True).start()
 
-    while True:
-        if state == 'clock':
-            write_fb(draw_clock())
-            if touch_event.wait(timeout=1):
-                touch_event.clear()
-                print(f"STATE: clock -> menu  pos={touch_pos}")
-                state = 'menu'
+    write_fb(draw_menu())
 
-        elif state == 'menu':
+    while True:
+        if touch_event.wait(timeout=0.1):
+            touch_event.clear()
+            i = touch_btn[0]
+            write_fb(draw_menu(active=i))
+            launch_app(i)
             write_fb(draw_menu())
-            if touch_event.wait(timeout=60):
-                touch_event.clear()
-                x, y = touch_pos
-                print(f"STATE: menu touch at ({x},{y})")
-                if 40 <= x <= 200 and 100 <= y <= 160:
-                    print("  -> App1")
-                    launch_app("App 1")
-                    state = 'menu'
-                elif 190 <= x <= 350 and 100 <= y <= 160:
-                    print("  -> App2")
-                    launch_app("App 2")
-                    state = 'menu'
-                elif 360 <= x <= 440 and 100 <= y <= 160:
-                    print("  -> App3")
-                    launch_app("App 3")
-                    state = 'menu'
-                elif 100 <= x <= 380 and 250 <= y <= 290:
-                    print("  -> BACK to clock")
-                    state = 'clock'
-                else:
-                    print(f"  -> no button matched, staying menu")
-            else:
-                print("STATE: menu timeout -> clock")
-                state = 'clock'
 
 if __name__ == '__main__':
     main()
