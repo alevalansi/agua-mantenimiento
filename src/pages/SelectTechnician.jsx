@@ -1,20 +1,43 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Droplets, User, Plus, Phone, ChevronLeft } from 'lucide-react';
+import { Droplets, User, Plus, Phone, Pencil, Trash2, Check, X, Camera } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { addTechnician } from '../utils/storage';
+import { addTechnician, updateTechnician, deleteTechnician, compressImageToBase64 } from '../utils/storage';
+
+function TechAvatar({ tech, size = 'w-10 h-10' }) {
+  if (tech.photo_url) {
+    return (
+      <img
+        src={tech.photo_url}
+        alt={tech.name}
+        className={`${size} rounded-full object-cover flex-shrink-0`}
+      />
+    );
+  }
+  return (
+    <div className={`${size} bg-sky-500/20 rounded-full flex items-center justify-center flex-shrink-0`}>
+      <span className="text-sky-400 font-bold text-sm">{tech.name.charAt(0)}</span>
+    </div>
+  );
+}
 
 export default function SelectTechnician() {
   const navigate = useNavigate();
   const { technicians, loading, dbError, setCurrentTechnician, refreshTechnicians, logActivity } = useApp();
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', specialty: '' });
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', phone: '', specialty: '' });
   const [saving, setSaving] = useState(false);
+
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', phone: '', specialty: '', photo_url: '' });
+  const editFileRef = useRef(null);
 
   const activeTechs = technicians.filter((t) => t.is_active !== false);
 
   const handleSelect = (tech) => {
+    if (editingId === tech.id) return;
     setCurrentTechnician(tech);
     logActivity({
       technician_name: tech.name,
@@ -24,20 +47,74 @@ export default function SelectTechnician() {
     navigate('/dashboard');
   };
 
+  const startEdit = (tech, e) => {
+    e.stopPropagation();
+    setEditingId(tech.id);
+    setEditForm({
+      name: tech.name,
+      phone: tech.phone || '',
+      specialty: tech.specialty || '',
+      photo_url: tech.photo_url || '',
+    });
+  };
+
+  const handleEditPhoto = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageToBase64(file);
+      setEditForm((f) => ({ ...f, photo_url: compressed }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSaveEdit = async (techId) => {
+    if (!editForm.name.trim()) return;
+    setSaving(true);
+    try {
+      await updateTechnician(techId, {
+        name: editForm.name.trim(),
+        phone: editForm.phone.trim(),
+        specialty: editForm.specialty.trim(),
+        photo_url: editForm.photo_url || null,
+      });
+      await refreshTechnicians();
+      setEditingId(null);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (tech, e) => {
+    e.stopPropagation();
+    if (!confirm(`למחוק את "${tech.name}"?`)) return;
+    try {
+      await deleteTechnician(tech.id);
+      await refreshTechnicians();
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    }
+  };
+
   const handleAddTech = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!addForm.name.trim()) return;
     setSaving(true);
     try {
       await addTechnician({
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        specialty: form.specialty.trim(),
+        name: addForm.name.trim(),
+        phone: addForm.phone.trim(),
+        specialty: addForm.specialty.trim(),
         is_active: true,
       });
       await refreshTechnicians();
-      setForm({ name: '', phone: '', specialty: '' });
-      setShowForm(false);
+      setAddForm({ name: '', phone: '', specialty: '' });
+      setShowAddForm(false);
     } catch (err) {
       console.error(err);
       alert('שגיאה: ' + (err.message || err));
@@ -66,10 +143,6 @@ export default function SelectTechnician() {
           </div>
           <h2 className="text-lg font-semibold text-red-400 mb-2">שגיאת חיבור למסד הנתונים</h2>
           <p className="text-slate-400 text-sm mb-3">{dbError}</p>
-          <p className="text-slate-500 text-xs mb-4 leading-relaxed">
-            יש להריץ את קובץ ה-SQL ב-Supabase Dashboard (SQL Editor) כדי ליצור את הטבלאות.
-            הקובץ נמצא ב: <code className="text-sky-400">supabase/migrations/20260525000000_init.sql</code>
-          </p>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm"
@@ -112,33 +185,117 @@ export default function SelectTechnician() {
           ) : (
             <div className="space-y-2 mb-4">
               {activeTechs.map((tech, i) => (
-                <motion.button
-                  key={tech.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => handleSelect(tech)}
-                  className="w-full flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors text-right"
-                >
-                  <div className="w-10 h-10 bg-sky-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-sky-400 font-bold text-sm">{tech.name.charAt(0)}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-100">{tech.name}</p>
-                    {tech.specialty && <p className="text-xs text-slate-400 truncate">{tech.specialty}</p>}
-                    {tech.phone && (
-                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                        <Phone size={10} />{tech.phone}
-                      </p>
-                    )}
-                  </div>
-                  <ChevronLeft size={16} className="text-slate-500" />
-                </motion.button>
+                <div key={tech.id}>
+                  {editingId === tech.id ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-slate-800 rounded-xl p-3 space-y-2 border border-sky-500/30"
+                    >
+                      {/* Photo + name row */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => editFileRef.current?.click()}
+                          className="relative flex-shrink-0 group"
+                        >
+                          {editForm.photo_url ? (
+                            <img src={editForm.photo_url} className="w-12 h-12 rounded-full object-cover" alt="" />
+                          ) : (
+                            <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center">
+                              <Camera size={18} className="text-slate-400" />
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 right-0 w-5 h-5 bg-sky-500 rounded-full flex items-center justify-center border-2 border-slate-800">
+                            <Camera size={9} className="text-white" />
+                          </div>
+                        </button>
+                        <input
+                          value={editForm.name}
+                          onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          placeholder="שם *"
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                      <input
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                        placeholder="טלפון"
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                      />
+                      <input
+                        value={editForm.specialty}
+                        onChange={(e) => setEditForm((f) => ({ ...f, specialty: e.target.value }))}
+                        placeholder="התמחות"
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                      />
+                      <input
+                        ref={editFileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleEditPhoto}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSaveEdit(tech.id)}
+                          disabled={saving}
+                          className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-1.5 text-xs font-medium flex items-center justify-center gap-1"
+                        >
+                          <Check size={13} />{saving ? 'שומר...' : 'שמור'}
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg py-1.5 text-xs flex items-center justify-center gap-1"
+                        >
+                          <X size={13} />ביטול
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="flex items-center gap-2 p-3 bg-slate-800 hover:bg-slate-750 rounded-xl"
+                    >
+                      <button
+                        onClick={() => handleSelect(tech)}
+                        className="flex items-center gap-3 flex-1 text-right min-w-0"
+                      >
+                        <TechAvatar tech={tech} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-100">{tech.name}</p>
+                          {tech.specialty && <p className="text-xs text-slate-400 truncate">{tech.specialty}</p>}
+                          {tech.phone && (
+                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Phone size={10} />{tech.phone}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={(e) => startEdit(tech, e)}
+                          className="p-1.5 text-slate-500 hover:text-sky-400 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(tech, e)}
+                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               ))}
             </div>
           )}
 
-          {showForm ? (
+          {showAddForm ? (
             <motion.form
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -149,34 +306,34 @@ export default function SelectTechnician() {
               <input
                 required
                 placeholder="שם *"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={addForm.name}
+                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
               />
               <input
                 placeholder="טלפון"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                value={addForm.phone}
+                onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
               />
               <input
                 placeholder="התמחות"
-                value={form.specialty}
-                onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+                value={addForm.specialty}
+                onChange={(e) => setAddForm({ ...addForm, specialty: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
               />
               <div className="flex gap-2">
                 <button type="submit" disabled={saving} className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium transition-colors">
                   {saving ? 'מוסיף...' : 'הוסף'}
                 </button>
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm transition-colors">
+                <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm transition-colors">
                   ביטול
                 </button>
               </div>
             </motion.form>
           ) : (
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => setShowAddForm(true)}
               className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-700 rounded-xl text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-colors text-sm"
             >
               <Plus size={16} />
