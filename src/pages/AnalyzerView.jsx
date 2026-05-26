@@ -1,16 +1,60 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Wrench, FlaskConical, Clock, CalendarDays, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Wrench, FlaskConical, Clock, CalendarDays, AlertTriangle, Pencil, Check, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { updateAnalyzer } from '../utils/storage';
 import { ANALYZER_TYPES, MAINTENANCE_TYPES, STATUS_LABELS, STATUS_COLORS, formatDate, daysUntil } from '../utils/helpers';
 import { PageWrapper, PageHeader, Card, Button } from '../components/Layout';
 
 export default function AnalyzerView() {
   const { id, analyzerId } = useParams();
   const navigate = useNavigate();
-  const { analyzers, stations, maintenanceLogs, chemicalConsumptions } = useApp();
+  const { analyzers, stations, maintenanceLogs, chemicalConsumptions, refreshAnalyzers, currentTechnician, logActivity } = useApp();
   const [tab, setTab] = useState('maintenance');
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setEditForm({
+      name: analyzer.name || '',
+      type: analyzer.type || '',
+      model: analyzer.model || '',
+      serial_number: analyzer.serial_number || '',
+      status: analyzer.status || 'operational',
+      maintenance_interval_days: analyzer.maintenance_interval_days || '',
+      chemical_renewal_interval_days: analyzer.chemical_renewal_interval_days || '',
+      notes: analyzer.notes || '',
+    });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.name.trim()) return;
+    setSaving(true);
+    try {
+      await updateAnalyzer(analyzerId, {
+        ...editForm,
+        maintenance_interval_days: editForm.maintenance_interval_days ? Number(editForm.maintenance_interval_days) : null,
+        chemical_renewal_interval_days: editForm.chemical_renewal_interval_days ? Number(editForm.chemical_renewal_interval_days) : null,
+      });
+      await refreshAnalyzers();
+      await logActivity({
+        technician_name: currentTechnician?.name,
+        action_type: 'edit_analyzer',
+        description: `עריכת מד ${editForm.name}`,
+        station_name: stations.find(s => s.id === id)?.name,
+        analyzer_name: editForm.name,
+      });
+      setEditing(false);
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: ' + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const analyzer = analyzers.find((a) => a.id === analyzerId);
   const station = stations.find((s) => s.id === id);
@@ -40,6 +84,9 @@ export default function AnalyzerView() {
         back={`/station/${id}`}
         actions={
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={startEdit}>
+              <Pencil size={16} />עריכה
+            </Button>
             <Button onClick={() => navigate(`/add-maintenance?analyzerId=${analyzerId}&stationId=${id}`)}>
               <Plus size={16} />תחזוקה
             </Button>
@@ -49,6 +96,53 @@ export default function AnalyzerView() {
           </div>
         }
       />
+
+      {/* Edit form */}
+      {editing && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="p-4 mb-6 border-sky-500/30">
+            <p className="text-sm font-medium text-slate-200 mb-3">עריכת מד</p>
+            <div className="space-y-2">
+              <input value={editForm.name} onChange={e => setEditForm(f=>({...f,name:e.target.value}))} placeholder="שם *"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+              <div className="grid grid-cols-2 gap-2">
+                <select value={editForm.type} onChange={e => setEditForm(f=>({...f,type:e.target.value}))}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+                  {Object.entries(ANALYZER_TYPES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                <select value={editForm.status} onChange={e => setEditForm(f=>({...f,status:e.target.value}))}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+                  {Object.entries(STATUS_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={editForm.model} onChange={e => setEditForm(f=>({...f,model:e.target.value}))} placeholder="דגם"
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+                <input value={editForm.serial_number} onChange={e => setEditForm(f=>({...f,serial_number:e.target.value}))} placeholder="מספר סידורי"
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" value={editForm.maintenance_interval_days} onChange={e => setEditForm(f=>({...f,maintenance_interval_days:e.target.value}))} placeholder="מרווח תחזוקה (ימים)"
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+                <input type="number" value={editForm.chemical_renewal_interval_days} onChange={e => setEditForm(f=>({...f,chemical_renewal_interval_days:e.target.value}))} placeholder="מרווח כימיקלים (ימים)"
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+              </div>
+              <textarea value={editForm.notes} onChange={e => setEditForm(f=>({...f,notes:e.target.value}))} placeholder="הערות" rows={2}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 resize-none" />
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={saveEdit} disabled={saving}
+                className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1">
+                <Check size={15}/>{saving ? 'שומר...' : 'שמור'}
+              </button>
+              <button onClick={() => setEditing(false)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg py-2 text-sm flex items-center justify-center gap-1">
+                <X size={15}/>ביטול
+              </button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Analyzer Details */}
       <Card className="p-4 mb-6">
