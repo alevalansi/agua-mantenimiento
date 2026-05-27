@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   MapPin, Cpu, Wrench, AlertTriangle, Plus, GripVertical,
-  ChevronLeft, Clock, CheckCircle
+  ChevronLeft, Clock, CheckCircle, Package, Printer
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { updateStation, getStationsOrder, setStationsOrder } from '../utils/storage';
@@ -13,7 +13,7 @@ import { PageWrapper, Card } from '../components/Layout';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { currentTechnician, stations, analyzers, maintenanceLogs, refreshStations } = useApp();
+  const { currentTechnician, stations, analyzers, maintenanceLogs, chemicalInventory, refreshStations } = useApp();
 
   const [stationList, setStationList] = useState([]);
 
@@ -42,6 +42,9 @@ export default function Dashboard() {
   });
 
   const alerts = analyzers.filter((a) => a.status === 'faulty' || a.status === 'needs_maintenance');
+  const lowStockItems = chemicalInventory.filter(
+    (i) => i.minimum_threshold > 0 && i.current_stock <= i.minimum_threshold
+  );
 
   const recentLogs = [...maintenanceLogs]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -75,6 +78,29 @@ export default function Dashboard() {
           {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </motion.div>
+
+      {/* Low stock alert */}
+      {lowStockItems.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="mb-4">
+          <Link to="/inventory" className="flex items-center gap-3 p-3 bg-amber-400/10 border border-amber-400/30 rounded-xl hover:bg-amber-400/15 transition-colors">
+            <Package size={18} className="text-amber-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-400">מלאי נמוך: {lowStockItems.length} כימיקלים</p>
+              <p className="text-xs text-amber-400/70 truncate">{lowStockItems.map((i) => i.chemical_name).join(', ')}</p>
+            </div>
+            <ChevronLeft size={16} className="text-amber-400 flex-shrink-0" />
+          </Link>
+        </motion.div>
+      )}
+
+      {/* Report button */}
+      <div className="flex justify-end mb-4">
+        <Link to="/report" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-sky-400 transition-colors">
+          <Printer size={14} />
+          הדפס דוח
+        </Link>
+      </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">

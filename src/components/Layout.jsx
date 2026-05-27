@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Droplets, Menu, X, LayoutDashboard, MapPin, Wrench, FlaskConical,
-  Package, Users, Activity, CalendarClock, LogOut, ChevronLeft,
+  Package, Users, Activity, CalendarClock, LogOut, ChevronLeft, Printer,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { STATUS_LABELS, STATUS_COLORS } from '../utils/helpers';
@@ -16,6 +16,7 @@ const navItems = [
   { path: '/inventory', label: 'מלאי כימיקלים', icon: Package },
   { path: '/technicians', label: 'טכנאים', icon: Users },
   { path: '/activity', label: 'יומן פעילות', icon: Activity },
+  { path: '/report', label: 'דוח / הדפסה', icon: Printer },
 ];
 
 export default function Layout({ children }) {

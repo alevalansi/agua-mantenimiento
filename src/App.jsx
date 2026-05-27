@@ -16,6 +16,7 @@ import ChemicalInventoryPage from './pages/ChemicalInventoryPage';
 import Technicians from './pages/Technicians';
 import ActivityLogPage from './pages/ActivityLogPage';
 import UpcomingTasks from './pages/UpcomingTasks';
+import ReportPage from './pages/ReportPage';
 
 function ProtectedRoute({ children }) {
   const { currentTechnician, loading, dbError } = useApp();
@@ -76,6 +77,7 @@ function AppRoutes() {
       <Route path="/technicians" element={<ProtectedRoute><Technicians /></ProtectedRoute>} />
       <Route path="/activity" element={<ProtectedRoute><ActivityLogPage /></ProtectedRoute>} />
       <Route path="/upcoming" element={<ProtectedRoute><UpcomingTasks /></ProtectedRoute>} />
+      <Route path="/report" element={<ProtectedRoute><ReportPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
