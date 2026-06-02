@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import {
   getTechnicians, getStations, getAnalyzers, getMaintenanceLogs,
   getChemicalConsumptions, getChemicalInventory, getActivityLog,
-  addActivityLog as storageAddActivityLog,
+  addActivityLog as storageAddActivityLog, updateAnalyzer,
   getCurrentTechnician, setCurrentTechnician as storageSetTech,
 } from '../utils/storage';
 
@@ -31,8 +31,29 @@ export function AppProvider({ children }) {
         getTechnicians(),
         getActivityLog(),
       ]);
+
+      // Auto-update analyzers with overdue maintenance to 'needs_maintenance'
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const overdueAnalyzers = a.filter((analyzer) => {
+        if (!analyzer.next_maintenance_date) return false;
+        if (analyzer.status === 'needs_maintenance' || analyzer.status === 'faulty') return false;
+        const next = new Date(analyzer.next_maintenance_date);
+        next.setHours(0, 0, 0, 0);
+        return next < today;
+      });
+      if (overdueAnalyzers.length > 0) {
+        await Promise.all(overdueAnalyzers.map((az) =>
+          updateAnalyzer(az.id, { status: 'needs_maintenance' })
+        ));
+        // Reload analyzers after updates
+        const updatedAnalyzers = await getAnalyzers();
+        setAnalyzersState(updatedAnalyzers);
+      } else {
+        setAnalyzersState(a);
+      }
+
       setStationsState(s);
-      setAnalyzersState(a);
       setMaintenanceLogsState(ml);
       setChemicalConsumptionsState(cc);
       setChemicalInventoryState(ci);

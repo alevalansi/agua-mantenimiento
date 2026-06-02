@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   MapPin, Cpu, Wrench, AlertTriangle, Plus, GripVertical,
-  ChevronLeft, Clock, CheckCircle, Package, Printer
+  ChevronLeft, Clock, CheckCircle, Package, Printer, CalendarClock
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { updateStation, getStationsOrder, setStationsOrder } from '../utils/storage';
@@ -46,6 +46,24 @@ export default function Dashboard() {
   const lowStockItems = chemicalInventory.filter(
     (i) => i.minimum_threshold > 0 && i.current_stock <= i.minimum_threshold
   );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const pendingTasks = analyzers
+    .filter((a) => {
+      if (!a.next_maintenance_date) return false;
+      const next = new Date(a.next_maintenance_date);
+      next.setHours(0, 0, 0, 0);
+      const diff = Math.round((next - today) / (1000 * 60 * 60 * 24));
+      return diff <= 7;
+    })
+    .map((a) => {
+      const next = new Date(a.next_maintenance_date);
+      next.setHours(0, 0, 0, 0);
+      const days = Math.round((next - today) / (1000 * 60 * 60 * 24));
+      return { ...a, daysUntil: days };
+    })
+    .sort((a, b) => a.daysUntil - b.daysUntil);
 
   const recentLogs = [...maintenanceLogs]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -92,6 +110,43 @@ export default function Dashboard() {
             </div>
             <ChevronLeft size={16} className="text-amber-400 flex-shrink-0" />
           </Link>
+        </motion.div>
+      )}
+
+      {/* Pending tasks */}
+      {pendingTasks.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarClock size={16} className="text-sky-400" />
+              <p className="text-sm font-semibold text-slate-200">עבודות פתוחות ({pendingTasks.length})</p>
+            </div>
+            <div className="space-y-2">
+              {pendingTasks.map((a) => {
+                const station = stations.find((s) => s.id === a.station_id);
+                const isOverdue = a.daysUntil < 0;
+                const isToday = a.daysUntil === 0;
+                return (
+                  <Link key={a.id} to={`/station/${a.station_id}/analyzer/${a.id}`}
+                    className="flex items-center justify-between gap-3 p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-100 truncate">{a.name}</p>
+                      <p className="text-xs text-slate-400 truncate">{station?.name}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                      isOverdue ? 'bg-red-400/15 text-red-400' :
+                      isToday ? 'bg-amber-400/15 text-amber-400' :
+                      'bg-sky-400/15 text-sky-400'
+                    }`}>
+                      {isOverdue ? `${Math.abs(a.daysUntil)} ימים איחור` :
+                       isToday ? 'היום' :
+                       `${a.daysUntil} ימים`}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </Card>
         </motion.div>
       )}
 
