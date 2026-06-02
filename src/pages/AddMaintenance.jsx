@@ -131,7 +131,7 @@ export default function AddMaintenance() {
               </Select>
             </div>
 
-            <Textarea label="תיאור הפעולה *" required placeholder="תאר את פעולת התחזוקה..." value={form.description} onChange={set('description')} rows={3} />
+            <Textarea label="תיאור הפעולה" placeholder="תאר את פעולת התחזוקה..." value={form.description} onChange={set('description')} rows={3} />
 
             <div className="grid grid-cols-2 gap-4">
               <Input label="חלקים שהוחלפו" placeholder="רשימת חלקים..." value={form.parts_replaced} onChange={set('parts_replaced')} />

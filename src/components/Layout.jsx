@@ -184,9 +184,9 @@ export function PageHeader({ title, subtitle, back, actions }) {
   );
 }
 
-export function Card({ children, className = '' }) {
+export function Card({ children, className = '', onClick }) {
   return (
-    <div className={`bg-slate-900 border border-slate-800 rounded-xl ${className}`}>
+    <div className={`bg-slate-900 border border-slate-800 rounded-xl ${className}`} onClick={onClick}>
       {children}
     </div>
   );

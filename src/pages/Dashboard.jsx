@@ -16,6 +16,7 @@ export default function Dashboard() {
   const { currentTechnician, stations, analyzers, maintenanceLogs, chemicalInventory, refreshStations } = useApp();
 
   const [stationList, setStationList] = useState([]);
+  const [showMonthLogs, setShowMonthLogs] = useState(false);
 
   // Apply saved order from localStorage whenever stations change
   useEffect(() => {
@@ -51,10 +52,10 @@ export default function Dashboard() {
     .slice(0, 5);
 
   const stats = [
-    { label: 'תחנות', value: stations.length, icon: MapPin, color: 'text-sky-400', bg: 'bg-sky-400/10' },
-    { label: 'מדים', value: analyzers.length, icon: Cpu, color: 'text-violet-400', bg: 'bg-violet-400/10' },
-    { label: 'תחזוקות החודש', value: monthLogs.length, icon: Wrench, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    { label: 'התראות פעילות', value: alerts.length, icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+    { label: 'תחנות', value: stations.length, icon: MapPin, color: 'text-sky-400', bg: 'bg-sky-400/10', onClick: null },
+    { label: 'מדים', value: analyzers.length, icon: Cpu, color: 'text-violet-400', bg: 'bg-violet-400/10', onClick: null },
+    { label: 'תחזוקות החודש', value: monthLogs.length, icon: Wrench, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: () => setShowMonthLogs((v) => !v) },
+    { label: 'התראות פעילות', value: alerts.length, icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-400/10', onClick: null },
   ];
 
   const handleDragEnd = async (result) => {
@@ -103,7 +104,7 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         {stats.map((s, i) => (
           <motion.div
             key={s.label}
@@ -111,7 +112,10 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
           >
-            <Card className="p-4">
+            <Card
+              className={`p-4 ${s.onClick ? 'cursor-pointer hover:border-emerald-500/40 transition-colors' : ''} ${showMonthLogs && s.label === 'תחזוקות החודש' ? 'border-emerald-500/40' : ''}`}
+              onClick={s.onClick || undefined}
+            >
               <div className={`w-9 h-9 ${s.bg} rounded-lg flex items-center justify-center mb-2`}>
                 <s.icon size={18} className={s.color} />
               </div>
@@ -121,6 +125,40 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Month logs panel */}
+      {showMonthLogs && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-slate-200">תחזוקות החודש ({monthLogs.length})</p>
+              <Link to="/logs/maintenance" className="text-xs text-sky-400 hover:text-sky-300">הכל</Link>
+            </div>
+            {monthLogs.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-4">אין תחזוקות החודש</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {[...monthLogs].sort((a, b) => new Date(b.date) - new Date(a.date)).map((log) => {
+                  const analyzer = analyzers.find((a) => a.id === log.analyzer_id);
+                  const station = stations.find((s) => s.id === log.station_id);
+                  return (
+                    <div key={log.id} className="flex items-center justify-between gap-2 p-2 bg-slate-800 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-100 truncate">{analyzer?.name || 'מד לא ידוע'}</p>
+                        <p className="text-xs text-slate-400 truncate">{station?.name} • {log.technician_name}</p>
+                      </div>
+                      <div className="text-left flex-shrink-0">
+                        <p className="text-xs text-slate-500">{formatDate(log.date)}</p>
+                        {log.status === 'completed' && <p className="text-xs text-emerald-400">הושלם</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stations drag & drop */}
