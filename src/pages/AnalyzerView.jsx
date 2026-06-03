@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Wrench, FlaskConical, Clock, CalendarDays, AlertTriangle, Pencil, Check, X } from 'lucide-react';
+import { Plus, Wrench, FlaskConical, Clock, CalendarDays, AlertTriangle, Pencil, Check, X, CheckCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { updateAnalyzer } from '../utils/storage';
 import { ANALYZER_TYPES, MAINTENANCE_TYPES, STATUS_LABELS, STATUS_COLORS, formatDate, daysUntil } from '../utils/helpers';
